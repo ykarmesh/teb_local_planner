@@ -218,6 +218,8 @@ public:
    * @return \c true if command is valid, \c false otherwise
    */
   virtual bool getVelocityCommand(double& vx, double& vy, double& omega) const;
+
+  void getFullTrajectory(std::vector<TrajectoryPointMsg>& trajectory) const;
   
   /**
    * @brief Access current best trajectory candidate (that relates to the "best" homotopy class).

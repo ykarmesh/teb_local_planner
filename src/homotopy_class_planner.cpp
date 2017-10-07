@@ -125,7 +125,7 @@ bool HomotopyClassPlanner::plan(const tf::Pose& start, const tf::Pose& goal, con
 }
 
 bool HomotopyClassPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel)
-{	
+{ 
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   
   // Update old TEBs with new start, goal and velocity
@@ -160,7 +160,15 @@ bool HomotopyClassPlanner::getVelocityCommand(double& vx, double& vy, double& om
   return best_teb->getVelocityCommand(vx, vy, omega); 
 }
 
-
+void HomotopyClassPlanner::getFullTrajectory(std::vector<TrajectoryPointMsg>& trajectory) const
+{
+  TebOptimalPlannerConstPtr best_teb = bestTeb();
+  if (!best_teb)
+  {
+    return;
+  }
+  best_teb->getFullTrajectory(trajectory);
+}
 
 
 void HomotopyClassPlanner::visualize()
@@ -240,7 +248,7 @@ void HomotopyClassPlanner::createGraph(const PoseSE2& start, const PoseSE2& goal
       if (start2obst.dot(diff)/dist<0.1)
         continue;
       
-      // Add Keypoints	
+      // Add Keypoints  
       HcGraphVertexType u = boost::add_vertex(graph_);
       graph_[u].pos = (*it_obst)->getCentroid() + normal;
       HcGraphVertexType v = boost::add_vertex(graph_);
@@ -253,7 +261,7 @@ void HomotopyClassPlanner::createGraph(const PoseSE2& start, const PoseSE2& goal
         nearest_obstacle.first = u;
         nearest_obstacle.second = v;
       }
-    }	
+    } 
   }
   
   HcGraphVertexType goal_vtx = boost::add_vertex(graph_); // goal vertex
@@ -311,7 +319,7 @@ void HomotopyClassPlanner::createGraph(const PoseSE2& start, const PoseSE2& goal
       }
       
       // Create Edge
-      boost::add_edge(*it_i,*it_j,graph_);			
+      boost::add_edge(*it_i,*it_j,graph_);      
     }
   }
   
@@ -420,7 +428,7 @@ void HomotopyClassPlanner::createProbRoadmapGraph(const PoseSE2& start, const Po
           continue; // diff is already normalized
       
 
-      // Collision Check	
+      // Collision Check  
       bool collision = false;
       for (ObstContainer::const_iterator it_obst = obstacles_->begin(); it_obst != obstacles_->end(); ++it_obst)
       {
@@ -434,7 +442,7 @@ void HomotopyClassPlanner::createProbRoadmapGraph(const PoseSE2& start, const Po
         continue;
       
       // Create Edge
-      boost::add_edge(*it_i,*it_j,graph_);			
+      boost::add_edge(*it_i,*it_j,graph_);      
     }
   }
   
@@ -510,7 +518,7 @@ bool HomotopyClassPlanner::hasEquivalenceClass(const EquivalenceClassPtr& eq_cla
 }
 
 bool HomotopyClassPlanner::addEquivalenceClassIfNew(const EquivalenceClassPtr& eq_class, bool lock)
-{	  
+{   
   if (!eq_class->isValid())
   {
     ROS_WARN("HomotopyClassPlanner: Ignoring invalid H-signature");
@@ -521,7 +529,7 @@ bool HomotopyClassPlanner::addEquivalenceClassIfNew(const EquivalenceClassPtr& e
     return false;
 
   // Homotopy class not found -> Add to class-list, return that the h-signature is new
-  equivalence_classes_.push_back(std::make_pair(eq_class,lock));	 
+  equivalence_classes_.push_back(std::make_pair(eq_class,lock));   
   return true;
 }
  
@@ -579,20 +587,20 @@ void HomotopyClassPlanner::renewAndAnalyzeOldTebs(bool delete_detours)
 //         assert(pt2);
 //       if ( cand_j->first->get()->getCurrentCost().sum() > cand_i->first->get()->getCurrentCost().sum() )
 //       {
-// 	// found one that has higher cost, therefore erase cand_j
-// 	tebs_.erase(cand_j->first);
-// 	teb_candidates.erase(cand_j);         
+//  // found one that has higher cost, therefore erase cand_j
+//  tebs_.erase(cand_j->first);
+//  teb_candidates.erase(cand_j);         
 //       }
 //       else   // otherwise erase cand_i
 //       {
-// 	tebs_.erase(cand_i->first);
-// 	cand_i = teb_candidates.erase(cand_i);
+//  tebs_.erase(cand_i->first);
+//  cand_i = teb_candidates.erase(cand_i);
 //       }
 //     }
 //     else 
 //     {
 //         ROS_WARN_STREAM("increase cand_i");
-//         ++cand_i;	
+//         ++cand_i;  
 //     }
 //   }
   
@@ -606,7 +614,7 @@ void HomotopyClassPlanner::renewAndAnalyzeOldTebs(bool delete_detours)
 //       tebs_.erase(cand->first);
 //     }
 //   }
-	
+  
 }
  
 void HomotopyClassPlanner::updateReferenceTrajectoryViaPoints(bool all_trajectories)
@@ -753,9 +761,9 @@ void HomotopyClassPlanner::deleteTebDetours(double threshold)
       // delete Detours if other TEBs will remain!
       if (tebs_.size()>1 && it_teb->get()->teb().detectDetoursBackwards(threshold))
       {
-	it_teb = tebs_.erase(it_teb); // 0.05
+  it_teb = tebs_.erase(it_teb); // 0.05
         it_eqclasses = equivalence_classes_.erase(it_eqclasses);
-	modified = true;
+  modified = true;
       }
     }
     
@@ -763,9 +771,9 @@ void HomotopyClassPlanner::deleteTebDetours(double threshold)
     // here, we ignore the lock-state, since we cannot keep trajectories that are not optimizable
     if (!it_teb->get()->isOptimized())
     {
-	it_teb = tebs_.erase(it_teb);
+  it_teb = tebs_.erase(it_teb);
         it_eqclasses = equivalence_classes_.erase(it_eqclasses);
-	modified = true;   
+  modified = true;   
         ROS_DEBUG("HomotopyClassPlanner::deleteTebDetours(): removing candidate that was not optimized successfully");
     }  
     
@@ -871,7 +879,7 @@ TebOptimalPlannerPtr HomotopyClassPlanner::selectBestTeb()
         best_teb_ = *it_teb;
         min_cost = teb_cost;
         }
-     }   	
+     }    
     
   
   // in case we haven't found any teb due to some previous checks, investigate list again

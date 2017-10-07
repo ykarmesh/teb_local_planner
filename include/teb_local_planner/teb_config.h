@@ -78,7 +78,7 @@ public:
     double global_plan_viapoint_sep; //!< Min. separation between each two consecutive via-points extracted from the global plan (if negative: disabled)
     bool via_points_ordered; //!< If true, the planner adheres to the order of via-points in the storage container
     double max_global_plan_lookahead_dist; //!< Specify maximum length (cumulative Euclidean distances) of the subset of the global plan taken into account for optimization [if <=0: disabled; the length is also bounded by the local costmap size!]
-    bool exact_arc_length; //!< If true, the planner uses the exact arc length in velocity, acceleration and turning rate computations [-> increased cpu time], otherwise the euclidean approximation is used.
+    bool exact_arc_length; //!< If true, the planner uses the exact arc length in velocity, acceleration, jerk and turning rate computations [-> increased cpu time], otherwise the euclidean approximation is used.
     double force_reinit_new_goal_dist; //!< Reinitialize the trajectory if a previous goal is updated with a seperation of more than the specified value in meters (skip hot-starting)
     int feasibility_check_no_poses; //!< Specify up to which pose on the predicted plan the feasibility should be checked each sampling interval.
     bool publish_feedback; //!< Publish planner feedback containing the full trajectory and a list of active obstacles (should be enabled only for evaluation or debugging purposes)
@@ -94,6 +94,8 @@ public:
     double acc_lim_x; //!< Maximum translational acceleration of the robot
     double acc_lim_y; //!< Maximum strafing acceleration of the robot
     double acc_lim_theta; //!< Maximum angular acceleration of the robot
+    double jerk_lim_x; //!< Maximum translational jerk of the robot
+    double jerk_lim_theta; //!< Maximum angular jerk of the robot
     double min_turning_radius; //!< Minimum turning radius of a carlike robot (diff-drive robot: zero); 
     double wheelbase; //!< The distance between the drive shaft and steering axle (only required for a carlike robot with 'cmd_angle_instead_rotvel' enabled); The value might be negative for back-wheeled robots!
     bool cmd_angle_instead_rotvel; //!< Substitute the rotational velocity in the commanded velocity message by the corresponding steering angle (check 'axles_distance')
@@ -141,6 +143,8 @@ public:
     double weight_acc_lim_x; //!< Optimization weight for satisfying the maximum allowed translational acceleration
     double weight_acc_lim_y; //!< Optimization weight for satisfying the maximum allowed strafing acceleration (in use only for holonomic robots)
     double weight_acc_lim_theta; //!< Optimization weight for satisfying the maximum allowed angular acceleration
+    double weight_jerk_lim_x; //!< Optimization weight for satisfying the maximum allowed translational jerk
+    double weight_jerk_lim_theta; //!< Optimization weight for satisfying the maximum allowed angular jerk
     double weight_kinematics_nh; //!< Optimization weight for satisfying the non-holonomic kinematics
     double weight_kinematics_forward_drive; //!< Optimization weight for forcing the robot to choose only forward directions (positive transl. velocities, only diffdrive robot)
     double weight_kinematics_turning_radius; //!< Optimization weight for enforcing a minimum turning radius (carlike robots)
@@ -238,6 +242,8 @@ public:
     robot.acc_lim_x = 0.5;
     robot.acc_lim_y = 0.5;
     robot.acc_lim_theta = 0.5;
+    robot.jerk_lim_x = 0.11;
+    robot.jerk_lim_theta = 0.11;
     robot.min_turning_radius = 0;
     robot.wheelbase = 1.0;
     robot.cmd_angle_instead_rotvel = false;
@@ -250,9 +256,9 @@ public:
     
     // Obstacles
     
-    obstacles.min_obstacle_dist = 0.5;
+    obstacles.min_obstacle_dist = 0.3;
     obstacles.inflation_dist = 0.6;
-    obstacles.include_costmap_obstacles = true;
+    obstacles.include_costmap_obstacles = false;
     obstacles.costmap_obstacles_behind_robot_dist = 1.5;
     obstacles.obstacle_poses_affected = 25;
     obstacles.legacy_obstacle_association = false;
@@ -275,6 +281,8 @@ public:
     optim.weight_acc_lim_x = 1;
     optim.weight_acc_lim_y = 1;
     optim.weight_acc_lim_theta = 1;
+    optim.weight_jerk_lim_x = 1;
+    optim.weight_jerk_lim_theta = 10;
     optim.weight_kinematics_nh = 1000;
     optim.weight_kinematics_forward_drive = 1;
     optim.weight_kinematics_turning_radius = 1;

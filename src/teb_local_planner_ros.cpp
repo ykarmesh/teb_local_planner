@@ -37,6 +37,8 @@
  *********************************************************************/
 
 #include <teb_local_planner/teb_local_planner_ros.h>
+#include <iomanip>
+#include <ctime>
 
 #include <tf_conversions/tf_eigen.h>
 
@@ -53,7 +55,7 @@
 #include "g2o/solvers/csparse/linear_solver_csparse.h"
 #include "g2o/solvers/cholmod/linear_solver_cholmod.h"
 
-
+std::clock_t start_time;
 // register this planner as a BaseLocalPlanner plugin
 PLUGINLIB_DECLARE_CLASS(teb_local_planner, TebLocalPlannerROS, teb_local_planner::TebLocalPlannerROS, nav_core::BaseLocalPlanner)
 
@@ -84,8 +86,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf::TransformListener* tf,
   if(!initialized_)
   {	
     // create Node Handle with name of plugin (as used in move_base for loading)
-    ros::NodeHandle nh("~/" + name);
-	        
+    ros::NodeHandle nh("~/" + name);        
     // get parameters of TebConfig via the nodehandle and override the default config
     cfg_.loadRosParamFromNodeHandle(nh);       
     
@@ -215,7 +216,9 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     ROS_ERROR("teb_local_planner has not been initialized, please call initialize() before using this planner");
     return false;
   }
-
+  //std::cout<<"In TIme  "<<std::setprecision(6)<<start_time<<std::endl;
+  //ros::Time T1_ = ros::Time::now();
+  start_time = std::clock();
   cmd_vel.linear.x = 0;
   cmd_vel.linear.y = 0;
   cmd_vel.angular.z = 0;
@@ -356,7 +359,7 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
     last_cmd_ = cmd_vel;
     return false;
   }
-  
+
   // Saturate velocity, if the optimization results violates the constraints (could be possible due to soft constraints).
   saturateVelocity(cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z, cfg_.robot.max_vel_x, cfg_.robot.max_vel_y,
                    cfg_.robot.max_vel_theta, cfg_.robot.max_vel_x_backwards);
@@ -384,16 +387,95 @@ bool TebLocalPlannerROS::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
   
   // store last command (for recovery analysis etc.)
   last_cmd_ = cmd_vel;
-  
+  //double duration= ( std::clock() - start_time ) / (double) CLOCKS_PER_SEC;
+  //std::cout<<"Duration "<<duration<<std::endl;
   // Now visualize everything    
   planner_->visualize();
   visualization_->publishObstacles(obstacles_);
   visualization_->publishViaPoints(via_points_);
   visualization_->publishGlobalPlan(global_plan_);
+  //std::cout<<cmd_vel;
   return true;
 }
+/*
+bool TebLocalPlannerROS::getTrajectory(std::vector<TrajectoryPointMsg>& trajectory, std::vector<Polynomial> poly_x, std::vector<Polynomial> poly_y, std::vector<Polynomial> poly_theta)
+{	geometry_msgs::Twist cmd_vel;
+	std::vector<double> x,y,theta,t;
+	double prev_t=0;
+	if(!computeVelocityCommands(cmd_vel))
+	{
+		return false;
+	}
+	planner_->getFullTrajectory(trajectory);
+	/*if(trajectory.size()>0)
+	{	
+		for (int i=0;i < trajectory.size()-1; i++)
+		{   x.push_back(trajectory[i].pose.position.x);
+			y.push_back(trajectory[i].pose.position.y);
+			theta.push_back(2 * atan2(trajectory[i].pose.orientation.z, trajectory[i].pose.orientation.w));
+			if(i==0)
+				t.push_back(0);
+			else
+				t.push_back(trajectory[i].time_from_start.toSec()-prev_t);
+				prev_t = t.back();
+			if((0<trajectory[i].velocity.linear.x)-(trajectory[i].velocity.linear.x<0) != (0<trajectory[i+1].velocity.linear.x)-(trajectory[i+1].velocity.linear.x<0))
+			{   Polynomial a(x, t, 1, 5);
+				Polynomial b(y, t, 1, 5);
+				Polynomial c(theta, t, 1, 5);
+				poly_x.push_back(a);
+				poly_y.push_back(b);
+				poly_theta.push_back(c);
+			}
+		}
+		return true;
+	}
 
+	return true;
+}
+*/
+/*
+void TebLocalPlannerROS::getAllTrajectories(vector<state_xytheta_vel>& trajectory_robot, std::vector<TrajectoryPointMsg> trajectory, vector<robot_state>& path_robot_, vector<vector<double>>& path_output)
+{ 
+  int num = trajectory.size();
 
+  state_xytheta_vel traj;
+  robot_state rob;
+  vector<double> path(3,0.0);
+  //path.resize(3);
+  for(int i=0;i<num;i++)
+  { 
+	traj.x = trajectory[i].pose.position.x;
+    traj.y = trajectory[i].pose.position.y;
+    traj.theta = 2 * atan2(trajectory[i].pose.orientation.z, trajectory[i].pose.orientation.w);
+    traj.vel = trajectory[i].velocity.linear.x;
+    traj.gamma = atan(1.1*trajectory[i].velocity.angular.z/trajectory[i].velocity.linear.x);   //L=1.1
+    if(((trajectory[i].velocity.angular.z == 0)&&(trajectory[i].velocity.linear.x == 0)))
+    { 
+        traj.gamma = 0;
+    }
+    trajectory_robot.push_back(traj);
+    rob.x = trajectory[i].pose.position.x;
+    rob.y = trajectory[i].pose.position.y;
+    rob.pallet_up = 0;
+    rob.pallet_state = 0;
+    rob.goal = 0;
+    rob.theta = traj.theta ;
+    path_robot_.push_back(rob);
+    path[0]=trajectory[i].pose.position.x;
+    path[1]=trajectory[i].pose.position.y;
+    path[2]=0;
+    path_output.push_back(path);
+    //std::cout <<  rob.x<<"  "<<rob.y<<"  "<<rob.theta<< "  "<<trajectory[i].velocity.angular.z<<"  "<<traj.vel<<"  "<< traj.gamma<< std::endl;
+  } 
+    //std::cout<<path_output[0].size()<<"\n"<<path_output[1].size()<<"  "<< path.size()<<"\n";
+    path_robot_.pop_back();
+    rob.pallet_up = 1;
+    rob.pallet_state = 1;
+    rob.goal = 1;
+    path_robot_.push_back(rob);
+
+}
+*/
 bool TebLocalPlannerROS::isGoalReached()
 {
   if (goal_reached_)

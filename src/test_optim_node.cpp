@@ -152,7 +152,7 @@ int main( int argc, char** argv )
 // Planning loop
 void CB_mainCycle(const ros::TimerEvent& e)
 {
-  planner->plan(PoseSE2(-4,0,0), PoseSE2(4,0,0)); // hardcoded start and goal for testing purposes
+  planner->plan(PoseSE2(0,4,0), PoseSE2(1,0,-1.57)); // hardcoded start and goal for testing purposes
 }
 
 // Visualization loop

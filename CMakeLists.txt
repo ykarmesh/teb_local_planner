@@ -25,11 +25,12 @@ find_package(catkin REQUIRED COMPONENTS
 )
 message(STATUS "System: ${CMAKE_SYSTEM}")
 ## System dependencies are found with CMake's conventions
-SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake_modules)
+SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake_modules )
 message(STATUS "${CMAKE_MODULE_PATH}")
 find_package(Boost REQUIRED COMPONENTS system thread graph)
 find_package(SUITESPARSE REQUIRED)
 find_package(G2O REQUIRED)
+#find_package(CXXLSFIT REQUIRED)
 
 # Eigen3 FindScript Backward compatibility (ubuntu saucy)
 # Since FindEigen.cmake is deprecated starting from jade.
@@ -160,7 +161,7 @@ catkin_package(
 	tf
 	tf_conversions
 	visualization_msgs
-  DEPENDS SUITESPARSE G2O
+  DEPENDS SUITESPARSE G2O 
 )
 
 ###########
@@ -196,6 +197,7 @@ add_dependencies(teb_local_planner ${PROJECT_NAME}_generate_messages_cpp)
 
 target_link_libraries(teb_local_planner
    ${EXTERNAL_LIBS}
+   # cxxlsfit
    ${catkin_LIBRARIES}
 )
 

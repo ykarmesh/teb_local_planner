@@ -61,6 +61,9 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <visualization_msgs/Marker.h>
 #include <teb_local_planner/ObstacleMsg.h>
+#include <teb_local_planner/TrajectoryMsg.h>
+//#include <robot_navigation/robot_navigation.h>
+//#include <robot_navigation/robot_state_msg.h>
 
 // transforms
 #include <tf/tf.h>
@@ -79,6 +82,8 @@
 // boost classes
 #include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
+
+//#include "Polynomial.hh"
 
 
 namespace teb_local_planner
@@ -134,7 +139,11 @@ public:
     */
   bool isGoalReached();
   
-  
+ // bool getTrajectory(std::vector<TrajectoryPointMsg>& trajectory,  std::vector<Polynomial> poly_x, std::vector<Polynomial> poly_y, std::vector<Polynomial> poly_theta);
+
+ /* void getAllTrajectories(vector<state_xytheta_vel>& trajectory_robot, std::vector<TrajectoryPointMsg> trajectory, 
+                                          vector<robot_state>& path_robot_, vector<vector<double>>& path_output);
+ */
     
   /** @name Public utility functions/methods */
   //@{
@@ -177,6 +186,8 @@ public:
    * @returns double value
    */
   static double getNumberFromXMLRPC(XmlRpc::XmlRpcValue& value, const std::string& full_param_name);
+  
+  
   
   //@}
   
@@ -391,6 +402,7 @@ private:
     
   // flags
   bool initialized_; //!< Keeps track about the correct initialization of this class
+
 
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

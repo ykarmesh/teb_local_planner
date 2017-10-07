@@ -53,6 +53,7 @@
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TwistStamped.h>
+#include <teb_local_planner/TrajectoryMsg.h>
 
 
 namespace teb_local_planner
@@ -132,6 +133,8 @@ public:
    * @return \c true if command is valid, \c false otherwise
    */
   virtual bool getVelocityCommand(double& vx, double& vy, double& omega) const = 0;
+
+  virtual void getFullTrajectory(std::vector<TrajectoryPointMsg>& trajectory) const = 0;
   
   //@}
   

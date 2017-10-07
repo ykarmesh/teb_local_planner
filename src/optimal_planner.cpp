@@ -35,7 +35,7 @@
  *
  * Author: Christoph Rösmann
  *********************************************************************/
-
+//launch-prefix="valgrind"
 #include <teb_local_planner/optimal_planner.h>
 #include <map>
 #include <limits>
@@ -130,6 +130,9 @@ void TebOptimalPlanner::registerG2OTypes()
   factory->registerType("EDGE_ACCELERATION_HOLONOMIC", new g2o::HyperGraphElementCreator<EdgeAccelerationHolonomic>);
   factory->registerType("EDGE_ACCELERATION_HOLONOMIC_START", new g2o::HyperGraphElementCreator<EdgeAccelerationHolonomicStart>);
   factory->registerType("EDGE_ACCELERATION_HOLONOMIC_GOAL", new g2o::HyperGraphElementCreator<EdgeAccelerationHolonomicGoal>);
+  factory->registerType("EDGE_JERK", new g2o::HyperGraphElementCreator<EdgeJerk>);
+  factory->registerType("EDGE_JERK_START", new g2o::HyperGraphElementCreator<EdgeJerkStart>);
+  factory->registerType("EDGE_JERK_GOAL", new g2o::HyperGraphElementCreator<EdgeJerkGoal>);
   factory->registerType("EDGE_KINEMATICS_DIFF_DRIVE", new g2o::HyperGraphElementCreator<EdgeKinematicsDiffDrive>);
   factory->registerType("EDGE_KINEMATICS_CARLIKE", new g2o::HyperGraphElementCreator<EdgeKinematicsCarlike>);
   factory->registerType("EDGE_OBSTACLE", new g2o::HyperGraphElementCreator<EdgeObstacle>);
@@ -261,7 +264,7 @@ bool TebOptimalPlanner::plan(const tf::Pose& start, const tf::Pose& goal, const 
 }
 
 bool TebOptimalPlanner::plan(const PoseSE2& start, const PoseSE2& goal, const geometry_msgs::Twist* start_vel, bool free_goal_vel)
-{	
+{ 
   ROS_ASSERT_MSG(initialized_, "Call initialize() first.");
   if (!teb_.isInit())
   {
@@ -316,7 +319,9 @@ bool TebOptimalPlanner::buildGraph(double weight_multiplier)
   
   AddEdgesAcceleration();
 
-  AddEdgesTimeOptimal();	
+  AddEdgesJerk();  
+
+  AddEdgesTimeOptimal();  
   
   if (cfg_->robot.min_turning_radius == 0 || cfg_->optim.weight_kinematics_turning_radius == 0)
     AddEdgesKinematicsDiffDrive(); // we have a differential drive robot
@@ -335,14 +340,14 @@ bool TebOptimalPlanner::optimizeGraph(int no_iterations,bool clear_after)
   {
     ROS_WARN("optimizeGraph(): Robot Max Velocity is smaller than 0.01m/s. Optimizing aborted...");
     if (clear_after) clearGraph();
-    return false;	
+    return false; 
   }
   
   if (!teb_.isInit() || teb_.sizePoses() < cfg_->trajectory.min_samples)
   {
     ROS_WARN("optimizeGraph(): TEB is empty or has too less elements. Skipping optimization.");
     if (clear_after) clearGraph();
-    return false;	
+    return false; 
   }
   
   optimizer_->setVerbose(cfg_->optim.optimization_verbose);
@@ -352,11 +357,11 @@ bool TebOptimalPlanner::optimizeGraph(int no_iterations,bool clear_after)
   
   if(!iter)
   {
-	ROS_ERROR("optimizeGraph(): Optimization failed! iter=%i", iter);
-	return false;
+  ROS_ERROR("optimizeGraph(): Optimization failed! iter=%i", iter);
+  return false;
   }
 
-  if (clear_after) clearGraph();	
+  if (clear_after) clearGraph();  
     
   return true;
 }
@@ -366,7 +371,7 @@ void TebOptimalPlanner::clearGraph()
   // clear optimizer states
   //optimizer.edges().clear(); // optimizer.clear deletes edges!!! Therefore do not run optimizer.edges().clear()
   optimizer_->vertices().clear();  // neccessary, because optimizer->clear deletes pointer-targets (therefore it deletes TEB states!)
-  optimizer_->clear();	
+  optimizer_->clear();  
 }
 
 
@@ -548,7 +553,7 @@ void TebOptimalPlanner::AddEdgesObstaclesLegacy(double weight_multiplier)
     
     // check if obstacle is outside index-range between start and goal
     if ( (index <= 1) || (index > teb_.sizePoses()-2) ) // start and goal are fixed and findNearestBandpoint finds first or last conf if intersection point is outside the range
-	    continue; 
+      continue; 
         
     if (inflated)
     {
@@ -831,6 +836,72 @@ void TebOptimalPlanner::AddEdgesAcceleration()
   }
 }
 
+void TebOptimalPlanner::AddEdgesJerk()
+{
+  if (cfg_->optim.weight_jerk_lim_x==0  && cfg_->optim.weight_jerk_lim_theta==0) 
+    return; // if weight equals zero skip adding edges!
+
+  int n = teb_.sizePoses();  
+    
+  if (cfg_->robot.max_vel_y == 0 || cfg_->robot.acc_lim_y == 0) // non-holonomic robot
+  {
+    Eigen::Matrix<double,2,2> information;
+    information.fill(0);
+    information(0,0) = cfg_->optim.weight_jerk_lim_x;
+    information(1,1) = cfg_->optim.weight_jerk_lim_theta;
+    
+    // check if an initial velocity should be taken into accound
+    if (vel_start_.first)
+    {
+      EdgeJerkStart* jerk_edge = new EdgeJerkStart;
+      jerk_edge->setVertex(0,teb_.PoseVertex(0));
+      jerk_edge->setVertex(1,teb_.PoseVertex(1));
+      jerk_edge->setVertex(2,teb_.PoseVertex(2));
+      jerk_edge->setVertex(3,teb_.TimeDiffVertex(0));
+      jerk_edge->setVertex(4,teb_.TimeDiffVertex(1));
+      jerk_edge->setInitialVelocity(vel_start_.second);
+      jerk_edge->setInformation(information);
+      jerk_edge->setTebConfig(*cfg_);
+      optimizer_->addEdge(jerk_edge);
+    }
+
+    // now add the usual jerk edge for each tuple of four teb poses
+    for (int i=0; i < n - 3; ++i)
+    {
+      EdgeJerk* jerk_edge = new EdgeJerk;
+      jerk_edge->setVertex(0,teb_.PoseVertex(i));
+      jerk_edge->setVertex(1,teb_.PoseVertex(i+1));
+      jerk_edge->setVertex(2,teb_.PoseVertex(i+2));
+      jerk_edge->setVertex(3,teb_.PoseVertex(i+3));
+      jerk_edge->setVertex(4,teb_.TimeDiffVertex(i));
+      jerk_edge->setVertex(5,teb_.TimeDiffVertex(i+1));
+      jerk_edge->setVertex(6,teb_.TimeDiffVertex(i+2));
+      jerk_edge->setInformation(information);
+      jerk_edge->setTebConfig(*cfg_);
+      optimizer_->addEdge(jerk_edge);
+    }
+    
+    // check if a goal velocity should be taken into accound
+    if (vel_goal_.first)
+    {
+      EdgeJerkGoal* jerk_edge = new EdgeJerkGoal;
+      jerk_edge->setVertex(0,teb_.PoseVertex(n-3));
+      jerk_edge->setVertex(1,teb_.PoseVertex(n-2));
+      jerk_edge->setVertex(2,teb_.PoseVertex(n-1));
+      jerk_edge->setVertex(3,teb_.TimeDiffVertex( teb_.sizeTimeDiffs()-2 ));
+      jerk_edge->setVertex(4,teb_.TimeDiffVertex( teb_.sizeTimeDiffs()-1 ));
+      jerk_edge->setGoalVelocity(vel_goal_.second);
+      jerk_edge->setInformation(information);
+      jerk_edge->setTebConfig(*cfg_);
+      optimizer_->addEdge(jerk_edge);
+    }  
+  }
+  else // holonomic robot
+  {
+    std::cout<<"Velocity along y is not zero, you have to make the robot nonholonomic"<<std::endl;
+  }
+}
+
 
 
 void TebOptimalPlanner::AddEdgesTimeOptimal()
@@ -872,7 +943,7 @@ void TebOptimalPlanner::AddEdgesKinematicsDiffDrive()
     kinematics_edge->setInformation(information_kinematics);
     kinematics_edge->setTebConfig(*cfg_);
     optimizer_->addEdge(kinematics_edge);
-  }	 
+  }  
 }
 
 void TebOptimalPlanner::AddEdgesKinematicsCarlike()
@@ -931,7 +1002,7 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
   {
     // here the graph is build again, for time efficiency make sure to call this function 
     // between buildGraph and Optimize (deleted), but it depends on the application
-    buildGraph();	
+    buildGraph(); 
     optimizer_->initializeOptimization();
   }
   else
@@ -986,6 +1057,13 @@ void TebOptimalPlanner::computeCurrentCost(double obst_cost_scale, double viapoi
     if (edge_acceleration!=NULL)
     {
       cost_ += edge_acceleration->getError().squaredNorm();
+      continue;
+    }
+
+    EdgeJerk* edge_jerk = dynamic_cast<EdgeJerk*>(*it);
+    if (edge_jerk!=NULL)
+    {
+      cost_ += edge_jerk->getError().squaredNorm();
       continue;
     }
     
@@ -1076,14 +1154,14 @@ bool TebOptimalPlanner::getVelocityCommand(double& vx, double& vy, double& omega
   
   double dt = teb_.TimeDiff(0);
   if (dt<=0)
-  {	
+  { 
     ROS_ERROR("TebOptimalPlanner::getVelocityCommand() - timediff<=0 is invalid!");
     vx = 0;
     vy = 0;
     omega = 0;
     return false;
   }
-	  
+    
   // Get velocity from the first two configurations
   extractVelocity(teb_.Pose(0), teb_.Pose(1), dt, vx, vy, omega);
   return true;
@@ -1270,4 +1348,4 @@ bool TebOptimalPlanner::isHorizonReductionAppropriate(const std::vector<geometry
   return false;
 }
 
-} // namespace teb_local_planner
+}
